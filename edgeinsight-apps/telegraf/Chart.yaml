@@ -1,0 +1,8 @@
+apiVersion: v2
+name: telegraf
+version: 0.0.1
+
+dependencies:
+  - name: telegraf
+    version: 1.8.38
+    repository: oci://edgeinsight.azurecr.io/helm

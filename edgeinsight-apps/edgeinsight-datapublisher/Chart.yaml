@@ -1,0 +1,8 @@
+apiVersion: v2
+name: edgeinsight-datapublisher
+version: 0.0.1
+
+dependencies:
+  - name: edgeinsight-datapublisher
+    version: 0.1.12
+    repository: oci://edgeinsight.azurecr.io/helm

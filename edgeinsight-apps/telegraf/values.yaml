@@ -1,0 +1,305 @@
+telegraf:  
+  image:
+    repo: "edgeinsight.azurecr.io/telegraf"
+    tag: "1.28.5"
+    pullPolicy: IfNotPresent
+  imagePullSecrets:
+    - name: edgeinsight
+  
+  envFromSecret: "rabbitmq"
+  env:
+    - name: RABBITUSER
+      value: "edgeadmin"
+    - name: RABBITPASS
+      valueFrom:
+        secretKeyRef: 
+          name: "rabbitmq"
+          key: rabbitmq-password 
+    - name: HOSTNAME
+      valueFrom:
+        fieldRef:
+          fieldPath: spec.nodeName
+    - name: HOSTIP
+      valueFrom:
+        fieldRef:
+          fieldPath: status.hostIP
+  volumes:
+  - name: logtest
+    hostPath:
+      path: "/var/log/pods/"
+  volumeMounts:
+    - name: logtest
+      mountPath: /var/log/pods/
+  labels: "rbac.authorization.k8s.io/aggregate-view-telegraf: true"
+  service:
+    enabled: false
+  serviceAccount:
+    create: true
+    name: telegraf
+
+  config:
+    agent:
+      interval: "10s"
+      round_interval: true
+      metric_batch_size: 600
+      metric_buffer_limit: 600
+      collection_jitter: "0s"
+      flush_interval: "11s"
+      flush_jitter: "0s"
+      precision: ""
+      debug: false
+      quiet: false
+      logfile: ""
+      hostname: "edgeinsight.staging.edgek3s"
+      omit_hostname: false
+    outputs:
+      - amqp:
+          brokers:
+            - "amqp://rabbitmq:5672/monitoring"
+          username: "${RABBITUSER}"
+          password: "${RABBITPASS}"
+        #  password: "LCCa20FqszA5O05V"
+          exchange: "monitoring"
+          exchange_type: "topic"
+          exchange_durability: "durable"
+          routing_tag: "routing_tag"
+          auth_method: "PLAIN"
+          delivery_mode: "transient"
+          content_encoding: "identity"
+  #        tagpass:  
+  #          routing_tag: ["monitoring.metrics"]
+          #content_encoding: "gzip"
+  #        data_format: json
+          use_batch_format: true
+
+  #    - amqp:
+  #        brokers:
+  #          - "amqp://rabbitmq:5672/monitoring"
+  #        username: "${RABBITUSER}"
+  #       # password: "${RABBITPASS}"
+  #        password: "LCCa20FqszA5O05V"
+  #        exchange: "monitoring"
+  #        exchange_type: "topic"
+  #        exchange_durability: "durable"
+  #        routing_tag: "routing_tag"
+  #        auth_method: "PLAIN"
+  #        delivery_mode: "transient"
+  #        content_encoding: "identity"
+  #        #content_encoding: "gzip"
+  #        tagpass:  
+  #          routing_tag: ["monitoring.logs"]
+  #        data_format: json
+  #        use_batch_format: true
+
+    inputs:
+      - kubernetes:
+          interval: "1m"
+          url: "https://$HOSTIP:10250"
+          insecure_skip_verify: true
+          fieldpass: [
+            "memory_available_bytes", "memory_usage_bytes", "network_rx_bytes", "network_tx_bytes",
+            "cpu_usage_nanocores", "rx_bytes", "tx_bytes",
+            ]
+          namedrop: ["kubernetes_system_container", "kubernetes_pod_volume"]
+          tagdrop:  
+            namespace: ["kube-system", "flux-system"]
+          tags:
+            routing_tag: "monitoring.metrics"
+      - kube_inventory:
+          interval: "1m"
+          namespace: ""
+          insecure_skip_verify: true
+          namepass: [
+            "kubernetes_deployment", "kubernetes_persistentvolumeclaim", "kubernetes_pod_container", "kubernetes_statefulset",
+            "kubernetes_certificate", "kubernetes_daemonset"
+            ]
+          fieldpass: [
+            "replicas_available", "replicas_unavailable", "phase_type ",
+            "restarts_total", "state_code", "state_reason", "phase_reason", "status_condition", 
+            "replicas", "replicas_ready", "age", "expiry", "enddate",
+            "number_unavailable", "number_ready"
+            ]
+          tagdrop:  
+            namespace: ["kube-system", "flux-system"]
+            condition: ["*"]
+          tags:
+            routing_tag: "monitoring.metrics"
+      - cpu:
+          percpu: false
+          totalcpu: true
+          collect_cpu_time: false
+          interval: "1m"
+          fieldpass: ["usage_system", "usage_user"]
+          tags:
+            routing_tag: "monitoring.metrics"
+      - disk:
+          ignore_fs: ["tmpfs", "devtmpfs", "devfs", "overlay", "aufs", "squashfs"]
+          interval: "60m"
+          fieldpass: ["free", "used_percent"]
+          tagpass:  
+            path: ["/etc/telegraf"]
+          tagexclude: ["mode", "path"]
+          tags:
+            routing_tag: "monitoring.metrics"
+      - system:
+          interval: "1m"
+          fieldpass: ["uptime", "load1", "load15", "n_cpus" ]
+          tags:
+            routing_tag: "monitoring.metrics"
+      - mem:
+          interval: "1m"
+          fieldpass: ["used", "available", "total", "available_percent" ]
+          tags:
+            routing_tag: "monitoring.metrics"
+      - net:
+          ignore_protocol_stats: true
+          interval: "1m"
+          fieldpass: ["bytes_sent", "bytes_recv"]
+          tags:
+            routing_tag: "monitoring.metrics"
+      - rabbitmq:
+          url: "http://rabbitmq:15672"
+          username: "${RABBITUSER}"
+          password: "${RABBITPASS}"
+    #      password: "LCCa20FqszA5O05V"        
+          interval: "1m"
+          tagexclude: ["url", "internal", "type", "auto_delete"]
+          metric_exclude: ["federation"]
+          namepass: ["rabbitmq_overview", "rabbitmq_node", "rabbitmq_queue", "rabbitmq_exchange"]
+          fieldpass: [
+            "messages", "messages_ready", "queues", "exchanges", "consumers", "connections",
+            "proc_total", "proc_used", "mem_used", "mem_limit", "disk_free", "disk_free_limit", "sockets_total", "sockets_used",
+            "consumer_utilisation", "message_bytes", "messages_publish", "messages_deliver",
+            "messages_publish_in", "messages_publish_out"
+            ]
+          tags:
+            routing_tag: "monitoring.metrics"
+
+  ### Amqp consumer for metrics from the Edge
+      - amqp_consumer:
+          brokers:
+            - "amqp://rabbitmq:5672/monitoring"
+          username: "${RABBITUSER}"
+          password: "${RABBITPASS}"
+  #        password: "LCCa20FqszA5O05V"
+          exchange: "devops.edgeinsight.abb"
+          exchange_type: "topic"
+          exchange_durability: "durable"
+          auth_method: "PLAIN"
+          content_encoding: "identity" #gzip, auto
+          queue: "edgemetrics"
+          queue_durability: "durable"
+          binding_key: "metrics"
+          data_format: "json"
+          json_string_fields: ["component", "version", "name", "fieldplugId"]
+          name_override: "edgeinsight"
+          tag_keys: ["version"]
+          tags:
+            routing_tag: "monitoring.metrics"
+            metricstype: "edgeinsight"
+
+    ## Amqp consumer for logs from rabbitmq
+      - amqp_consumer:
+          brokers:
+            - "amqp://rabbitmq:5672/data"
+          alias: "rabbitmqlogs"
+          username: "${RABBITUSER}"
+          password: "${RABBITPASS}"
+      #    password: "LCCa20FqszA5O05V"
+          exchange: "amq.rabbitmq.log"
+          exchange_type: "topic"
+          exchange_passive: true
+          exchange_durability: "durable"
+          exchange_arguments:
+            internal: "true"
+          auth_method: "PLAIN"
+          content_encoding: "auto" #gzip, auto
+          queue: "telegraf.rabbitmqlogs"
+          queue_durability: "durable"
+          binding_key: "#"
+          data_format: "grok"
+          grok_patterns: ['%{TIMESTAMP_ISO8601:timestamp} \[%{LOGLEVEL:level}\] %{GREEDYDATA:message}']
+          name_override: "log"
+          tags:
+            routing_tag: "monitoring.logs"
+            name: "rabbitmq"
+
+    ## Amqp consumer for logs from EdgeInsight omponents
+      - amqp_consumer:
+          brokers:
+            - "amqp://rabbitmq:5672/monitoring"
+          username: "${RABBITUSER}"
+          password: "${RABBITPASS}"
+     #     password: "LCCa20FqszA5O05V"
+          exchange: "devops.edgeinsight.abb"
+          exchange_type: "topic"
+          exchange_durability: "durable"
+          auth_method: "PLAIN"
+          content_encoding: "auto" #gzip, auto
+          queue: "edgelogs"
+          queue_durability: "durable"
+          binding_key: "logs"
+          data_format: "json"
+          json_string_fields: ["log_timestamp", "log_level", "log_namespace", "log_message", "name", "log_stacktrace"]
+          name_override: "log"
+          fielddrop: ["component"]
+          tag_keys: ["version"]
+          tags:
+            routing_tag: "monitoring.logs"
+
+    processors:
+      - rename:
+          replace:
+            field: "msg"
+            dest: "message"
+    #Convert rabbitmq log name field from tag to field
+      - converter:
+          alias: "rabbitmqlogs"
+          tags:
+            string: ["name"]
+    #Convert rabbitmq log timestamp to RFC3339
+      - regex:
+          alias: "rabbitmqlogs"
+          fields:
+            key: "timestamp"
+            pattern: "(\\d{4}-\\d{2}-\\d{2}) (\\d{2}:\\d{2}:\\d{2}\\.\\d{6})\\+\\d{2}:\\d{2}"
+            replacement: "${1}T${2}Z"
+    #Convert rabbitmq log level fields to standard
+      - enum:
+          mapping:
+            field: "level"
+            value_mappings:
+              error: ERROR 
+              warning: WARN
+              info: INFO
+    #Convert edgeinsight fieldnames to standard
+      - rename:
+          replace:
+            field: "log_timestamp"
+            dest: "timestamp"
+      - rename:
+          replace:
+            field: "log_level"
+            dest: "level"
+      - rename:
+          replace:
+            field: "log_namespace"
+            dest: "namespace"
+      - rename:
+          replace:
+            field: "log_message"
+            dest: "message"
+      - rename:
+          replace:
+            field: "log_stacktrace"
+            dest: "stacktrace"
+            
+  metrics:
+    internal:
+      enabled: false
+
+  pdb:
+    create: true
+    minAvailable: 1
+    # maxUnavailable: 1
+

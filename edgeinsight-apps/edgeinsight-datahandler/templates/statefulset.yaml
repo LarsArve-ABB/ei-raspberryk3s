@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: '{{ .Release.Name }}-edgeinsight-datahandler'
+spec:
+  serviceName: "edgeinsight-datahandler"
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      edgeinsight/component: edgeinsight-datahandler
+  template:
+    metadata:
+      labels:
+        edgeinsight/component: edgeinsight-datahandler
+        edgeinsight/release: '{{ .Release.Name }}'
+    spec:
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+      {{ toYaml .Values.imagePullSecrets | indent 8 }}
+    {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          volumeMounts:
+          - name: edgeinsight-datahandler
+            mountPath: /app/datastore
+          env:
+            - name: RabbitMq__host
+              value: "{{ .Values.rabbitmq.host }}"
+            - name: RabbitMq__port
+              value: "{{ .Values.rabbitmq.port }}"
+            - name: RabbitMq__username
+              value: "{{ .Values.rabbitmq.user }}"
+            - name: RabbitMq__password
+              {{- if .Values.rabbitmq.passwordSecretName }}
+              valueFrom:
+                secretKeyRef: 
+                  name: "{{ .Values.rabbitmq.passwordSecretName }}"
+                  key: rabbitmq-password 
+              {{- else }}
+              value: "{{ .Values.rabbitmq.password }}"
+              {{- end }}
+            - name: RabbitMq__Exchange__dataInput__vhost
+              value: "{{ .Values.rabbitmq.dataVhost }}"
+            - name: RabbitMq__Exchange__dataInput__exchange
+              value: "{{ .Values.rabbitmq.dataExchange }}"
+            - name: RabbitMq__Exchange__commandInput__vhost
+              value: "{{ .Values.rabbitmq.commandVhost }}"
+            - name: RabbitMq__Exchange__commandInput__exchange
+              value: "{{ .Values.rabbitmq.commandExchange }}"
+            - name: RabbitMq__Exchange__monitoringOutput__vhost
+              value: "{{ .Values.rabbitmq.monitoringVhost }}"
+            - name: RabbitMq__Exchange__monitoringOutput__exchange
+              value: "{{ .Values.rabbitmq.monitoringExchange }}"
+            - name: dataHandler__name
+              value: "{{ .Values.datahandler.name }}"
+            - name: dataHandler__enableMonitoringLog
+              value: "{{ .Values.datahandler.amqpLog }}"
+            - name: dataHandler__enableMetrics
+              value: "{{ .Values.datahandler.amqpMetrics }}"
+            - name: dataHandler__metricsInterval
+              value: "{{ .Values.datahandler.metricsInterval }}"
+            - name: dataHandler__monitoringLogInterval
+              value: "{{ .Values.datahandler.logInterval }}"
+            - name: storage__rootPath
+              value: "{{ .Values.storage.rootPath }}"
+            - name: storage__useDisk
+              value: "{{ .Values.storage.useDisk }}"
+
+  volumeClaimTemplates:
+  - metadata:
+      name: edgeinsight-datahandler
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi

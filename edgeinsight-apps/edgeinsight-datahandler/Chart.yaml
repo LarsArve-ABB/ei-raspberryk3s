@@ -1,0 +1,10 @@
+kind: Chart
+icon: https://github.com/helm/helm/tree/main/docs/chart_icons
+apiVersion: v2
+description: A helm chart for datahandler
+name: edgeinsight-datahandler
+type: application
+# We are setting the version field to be the same as the application version.
+# This decision was made because the application version follows semantic versioning,
+# and it is easier to identify which application is running when the Helm chart version matches the application version.
+version: 0.0.0

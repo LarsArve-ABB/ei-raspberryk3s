@@ -1,0 +1,56 @@
+edgeinsight-opcuaserver:
+  
+  replicaCount: 1
+  image:
+    repository: edgeinsight.azurecr.io/edgeinsight-opcuaserver
+    pullPolicy: IfNotPresent
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: "1.12.0"
+  imagePullSecrets:
+    - name: edgeinsight
+  
+  service:
+    nodePort: 32000
+  
+  rabbitmq:
+    host: rabbitmq
+    port: "5672"
+    user: edgeadmin
+    passwordSecretName: rabbitmq
+    password: AbbAbility2016
+    timeseriesQueueOptions:
+      perQueueMessageTtl: "3600"
+    dataVhost: data
+    dataExchange: data.edgeinsight.abb
+    commandVhost: data
+    commandExchange: commands.edgeinsight.abb
+    monitoringVhost: monitoring
+    monitoringExchange: devops.edgeinsight.abb
+  
+  uaserver:
+    name: opcuaserver
+    appId: DF0C0926-1FEF-4D52-9E1C-B2901C772AFF
+    enableEventHistory: "false"
+    amqpMetrics: "false"
+    amqpLog: "false"
+    enableNonSecureEndpoint: "true"
+    enableSignOnlyEndpoint: "true"
+    enableVariableHistory: "false"
+    metricsInterval: "10000"
+    logInterval: "10000"
+    session:
+      maxSessionCount: "100"
+    subscription:
+      maxMessageQueueSize: "100"
+      maxNotificationsPerPublish: "10000"
+      maxSubscriptionCount: "1000"
+      maxSubscriptionsPerSession: "100"
+      minPublishingInterval: "100"
+    transport:
+      maxArrayLength: "65535"
+      maxByteStringLength: "16777216"
+      maxStringLength: "16777216"
+  
+  signalR:
+    hubUrl: http://datahistory:5000/datahistory
+    clientId: edgeinsight-opcuaserver

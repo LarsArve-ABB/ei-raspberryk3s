@@ -1,0 +1,116 @@
+rabbitmq:
+  replicaCount: 1
+  image:
+    registry: edgeinsight.azurecr.io
+    repository: rabbitmq
+    tag: "3.12.10"
+    pullPolicy: IfNotPresent
+
+  global:
+    imagePullSecrets:
+      - name: edgeinsight
+
+  service:
+    type: NodePort
+    nodePorts:
+      amqp: "30672"
+    # amqpTls: ""
+      manager: "31672"
+  extraPlugins: " rabbitmq_shovel rabbitmq_shovel_management rabbitmq_prometheus rabbitmq_federation"
+  auth:
+    username: edgeadmin
+    #password: abb1234
+    #existingPasswordSecret: edgeinsight-auth
+    securePassword: false
+    tls:
+      enabled: false
+      startTls: false
+      sslOptionsVerify: "verify_none"
+      failIfNoPeerCert: false
+      skipVerify: true
+      verify: "verify_none"
+  extraEnvVars:
+    - name: RABBITMQ_LOG_LEVEL
+      value: debug
+  extraSecrets:
+    edgeinsight-auth:
+      rabbitmq-user: edgetest
+      rabbitmq-password: secure
+    load-definition:
+      load_definition.json: |
+        {
+          "vhosts": [
+            {
+              "name": "data"
+            },
+            {
+              "name": "monitoring"
+            }
+          ],
+          "queues": [
+            {
+              "name": "monitoring.logs",
+              "vhost": "monitoring",
+              "durable": true,
+              "auto_delete": false,
+              "arguments": {
+                "x-max-length-bytes": 524288000
+              }
+            },
+            {
+              "name": "monitoring.metrics",
+              "vhost": "monitoring",
+              "durable": true,
+              "auto_delete": false,
+              "arguments": {
+                "x-max-length-bytes": 262144000
+              }
+            }
+          ],
+          "exchanges": [
+            {
+              "name": "monitoring",
+              "vhost": "monitoring",
+              "type": "topic",
+              "durable": true,
+              "auto_delete": false,
+              "internal": false,
+              "arguments": {
+              }
+            }
+          ],
+          "bindings": [
+            {
+              "source": "monitoring",
+              "vhost": "monitoring",
+              "destination": "monitoring.logs",
+              "destination_type": "queue",
+              "routing_key": "monitoring.logs",
+              "arguments": {
+                
+              }
+            },
+            {
+              "source": "monitoring",
+              "vhost": "monitoring",
+              "destination": "monitoring.metrics",
+              "destination_type": "queue",
+              "routing_key": "monitoring.metrics",
+              "arguments": {
+                
+              }
+            }
+          ]
+        }
+  loadDefinition:
+    enabled: true
+    existingSecret: load-definition
+#  logs: "+json"
+  logs: false
+  extraConfiguration: |
+    load_definitions = /app/load_definition.json
+    default_vhost = data
+    log.console = true
+    log.console.level = info
+    log.exchange = true
+    log.exchange.level = info

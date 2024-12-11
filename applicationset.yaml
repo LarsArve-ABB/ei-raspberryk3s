@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: edgeinsight-apps
+  namespace: argocd
+spec:
+  generators:
+    - git:
+        repoURL:  https://github.com/ABB-PAEN/ei-raspberryk3s-test.git
+        revision: HEAD
+        directories:
+          - path: edgeinsight-apps/*
+
+  template:
+    metadata:
+      name: '{{path[1]}}'
+
+    spec:
+      project: edgeinsight    
+      source:
+        repoURL: https://github.com/ABB-PAEN/ei-raspberryk3s-test.git
+        path: '{{path}}'
+        targetRevision: HEAD
+      
+      destination:
+#        name: https://kubernetes.default.svc
+        name: default
+        namespace: default
+
+      syncPolicy:
+        automated: {}
+#        automated:
+#          selfHeal: true
+#          prune: false
+#        syncOptions:
+#          - CreateNamespace=true
+#          - ServerSideApply=true
+
+
+

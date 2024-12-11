@@ -1,0 +1,8 @@
+apiVersion: v2
+name: edgeinsight-opcuaserver
+version: 0.0.1
+
+dependencies:
+  - name: edgeinsight-opcuaserver
+    version: 0.1.24
+    repository: oci://edgeinsight.azurecr.io/helm

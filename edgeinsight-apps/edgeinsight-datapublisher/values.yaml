@@ -1,0 +1,32 @@
+edgeinsight-datapublisher:
+  
+  replicaCount: 1
+  image:
+    repository: edgeinsight.azurecr.io/edgeinsight-datapublisher
+    pullPolicy: IfNotPresent
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: "1.12.0"
+  imagePullSecrets:
+    - name: edgeinsight
+  
+  rabbitmq:
+    host: rabbitmq
+    port: "5672"
+    user: edgeadmin
+    passwordSecretName: rabbitmq
+    password: AbbAbility2016
+    dataVhost: data
+    dataExchange: data.edgeinsight.abb
+    outputVhost: data
+    brotliCompress: "true"
+    init: "true"
+    monitoringExchange: devops.edgeinsight.abb
+    monitoringVhost: devops.edgeinsight.abb
+  
+  datapublisher:
+    name: edgeinsight-datapublisher
+    sitename: test
+    amqpMetrics: "false"
+    amqpLog: "false"
+    metricsInterval: "15000"
+    logInterval: "10000"

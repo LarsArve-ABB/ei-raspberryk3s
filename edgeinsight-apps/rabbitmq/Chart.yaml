@@ -1,0 +1,8 @@
+apiVersion: v2
+name: rabbitmq
+version: 0.0.1
+
+dependencies:
+  - name: rabbitmq
+    version: 12.5.6
+    repository: oci://edgeinsight.azurecr.io/helm
